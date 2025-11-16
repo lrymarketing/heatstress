@@ -91,14 +91,18 @@
             </div>
 
             <!-- Manual Location Input (hidden by default) -->
-            <div id="manualInputBox" class="hidden mt-4 space-y-2">
+            <div id="manualInputBox" class="hidden mt-4 space-y-2 relative">
                 <label for="locationInput" class="block text-sm font-medium text-gray-700">Or enter location manually:</label>
                 <div class="flex space-x-2">
-                    <input type="text" id="locationInput" placeholder="e.g., 'Kirwan'" class="flex-grow block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <input type="text" id="locationInput" placeholder="e.g., 'West End'" class="flex-grow block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                     <button id="searchButton" class="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400">
                         Search
                     </button>
                 </div>
+                <!-- Search Results Dropdown -->
+                <ul id="searchResultsList" class="hidden absolute z-50 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                    <!-- List items injected via JS -->
+                </ul>
             </div>
 
             <!-- Results Section (hidden by default) -->
@@ -106,7 +110,7 @@
                 
                 <!-- Location with Edit Button -->
                 <div class="flex flex-col items-center">
-                    <div class="flex items-center justify-center gap-2">
+                    <div class="flex items-center justify-center gap-2 text-center">
                         <h2 class="text-xl font-semibold text-gray-700" id="location"></h2>
                         <!-- Edit Pencil Icon -->
                         <button id="editLocationBtn" class="text-gray-400 hover:text-blue-600 focus:outline-none transition-colors p-1" aria-label="Change Location" title="Change Location">
@@ -251,8 +255,9 @@
         const manualInputBox = document.getElementById('manualInputBox');
         const locationInput = document.getElementById('locationInput');
         const searchButton = document.getElementById('searchButton');
+        const searchResultsList = document.getElementById('searchResultsList'); // New List
         const currentTimeLabel = document.getElementById('currentTimeLabel');
-        const editLocationBtn = document.getElementById('editLocationBtn'); // New button
+        const editLocationBtn = document.getElementById('editLocationBtn');
 
         const locationEl = document.getElementById('location');
         const feelsLikeTempEl = document.getElementById('feelsLikeTemp');
@@ -375,11 +380,11 @@
                 showError("Please enter a city or suburb name.");
                 return;
             }
-            loader.classList.remove('hidden');
-            checkButton.classList.add('hidden');
+            // Don't hide everything yet, wait to see if we find matches
+            // Clear previous errors
             errorBox.classList.add('hidden');
-            manualInputBox.classList.add('hidden');
-            results.classList.add('hidden');
+            searchResultsList.classList.add('hidden');
+            searchResultsList.innerHTML = '';
 
             geocodeAndFetch(cityName);
         });
@@ -391,12 +396,15 @@
             // Show initial search buttons again
             checkButton.classList.remove('hidden');
             manualInputBox.classList.remove('hidden');
+            searchResultsList.classList.add('hidden');
             // Clear input focus for convenience
             locationInput.value = '';
             locationInput.focus();
         });
 
         function handleGeoSuccess(position) {
+            // Hide manual input section when GPS succeeds
+            manualInputBox.classList.add('hidden');
             fetchDataAndDisplay(position.coords.latitude, position.coords.longitude);
         }
 
@@ -412,6 +420,8 @@
                 const data = await response.json();
                 
                 if (data.latitude && data.longitude) {
+                    // Hide manual input section when fallback succeeds
+                    manualInputBox.classList.add('hidden');
                     fetchDataAndDisplay(data.latitude, data.longitude, data.city);
                 } else {
                     throw new Error('Invalid IP data');
@@ -424,7 +434,8 @@
 
         async function geocodeAndFetch(cityName) {
             try {
-                const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&format=json`;
+                // Request more results (count=5) to handle duplicates like "West End"
+                const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=5&format=json`;
                 const response = await fetch(geoUrl);
                 if (!response.ok) throw new Error("Location search failed.");
                 
@@ -433,25 +444,84 @@
                     throw new Error(`Could not find "${cityName}".`);
                 }
 
-                const location = geoData.results[0];
-                
-                const displayParts = [];
-                if (location.name) displayParts.push(location.name);
-                if (location.admin1) displayParts.push(location.admin1);
-                else if (location.country) displayParts.push(location.country);
-                
-                const name = displayParts.join(', ');
-
-                fetchDataAndDisplay(location.latitude, location.longitude, name);
+                if (geoData.results.length === 1) {
+                    // Only one result, proceed automatically
+                    const location = geoData.results[0];
+                    const displayParts = [];
+                    if (location.name) displayParts.push(location.name);
+                    if (location.admin2) displayParts.push(location.admin2); // Added City/Region
+                    if (location.admin1) displayParts.push(location.admin1);
+                    else if (location.country) displayParts.push(location.country);
+                    
+                    const name = displayParts.join(', ');
+                    
+                    // Hide manual box and loader
+                    loader.classList.remove('hidden');
+                    checkButton.classList.add('hidden');
+                    manualInputBox.classList.add('hidden');
+                    
+                    fetchDataAndDisplay(location.latitude, location.longitude, name);
+                } else {
+                    // Multiple results, show list for user to pick
+                    renderSearchResults(geoData.results);
+                }
 
             } catch (error) {
                 showError(error.message);
             }
         }
 
+        function renderSearchResults(results) {
+            searchResultsList.innerHTML = '';
+            
+            results.forEach(loc => {
+                const li = document.createElement('li');
+                li.className = "px-4 py-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0 transition-colors";
+                
+                // Build a clear display string: "West End, Queensland, Australia"
+                let text = `<span class="font-semibold text-gray-800">${loc.name}</span>`;
+                const details = [];
+                if (loc.admin2) details.push(loc.admin2); // Added City/Region
+                if (loc.admin1) details.push(loc.admin1);
+                if (loc.country) details.push(loc.country);
+                
+                if (details.length > 0) {
+                    text += `<br><span class="text-xs text-gray-500">${details.join(', ')}</span>`;
+                }
+                
+                li.innerHTML = text;
+                
+                li.addEventListener('click', () => {
+                    // User picked this location
+                    const displayNameParts = [loc.name];
+                    if (loc.admin2) displayNameParts.push(loc.admin2); // Include City/Region in selected name
+                    if (loc.admin1) displayNameParts.push(loc.admin1);
+                    else if (loc.country) displayNameParts.push(loc.country);
+                    
+                    const displayName = displayNameParts.join(', ');
+                    
+                    // Update UI state
+                    searchResultsList.classList.add('hidden');
+                    loader.classList.remove('hidden');
+                    checkButton.classList.add('hidden');
+                    manualInputBox.classList.add('hidden');
+                    
+                    fetchDataAndDisplay(loc.latitude, loc.longitude, displayName);
+                });
+                
+                searchResultsList.appendChild(li);
+            });
+            
+            searchResultsList.classList.remove('hidden');
+        }
+
         async function fetchDataAndDisplay(lat, lon, manualCityName = null) {
             try {
-                // Fetch Weather (Now includes hourly data for timeline)
+                // Show loader if not already shown
+                loader.classList.remove('hidden');
+                results.classList.add('hidden');
+                
+                // Fetch Weather
                 const weather = await getWeatherData(lat, lon);
                 
                 let city = manualCityName;
@@ -466,7 +536,7 @@
                 // Display Main Data
                 displayResults(weather, warning, city);
                 
-                // Render Timeline (7am - 4pm)
+                // Render Timeline
                 renderTimeline(weather.hourly);
 
             } catch (error) {
@@ -691,6 +761,8 @@
             manualInputBox.classList.remove('hidden');
             loader.classList.add('hidden');
             checkButton.classList.remove('hidden');
+            // Hide list if error happens
+            searchResultsList.classList.add('hidden');
         }
     </script>
 </body>
