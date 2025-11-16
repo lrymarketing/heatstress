@@ -434,22 +434,37 @@
 
         async function geocodeAndFetch(cityName) {
             try {
-                // Request more results (count=5) to handle duplicates like "West End"
-                const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=5&format=json`;
+                // Request more results (count=10) to handle duplicates
+                // Filter for Australia client-side to ensure accuracy
+                const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=10&format=json`;
                 const response = await fetch(geoUrl);
                 if (!response.ok) throw new Error("Location search failed.");
                 
                 const geoData = await response.json();
-                if (!geoData.results || geoData.results.length === 0) {
-                    throw new Error(`Could not find "${cityName}".`);
+                let results = geoData.results || [];
+
+                // 1. Filter: Only keep results where country_code is "AU" (Australia)
+                results = results.filter(loc => loc.country_code === 'AU');
+
+                if (results.length === 0) {
+                    throw new Error(`Could not find "${cityName}" in Australia.`);
                 }
 
-                if (geoData.results.length === 1) {
+                // 2. Sort: Prioritize "Queensland" in admin1
+                results.sort((a, b) => {
+                    const aIsQLD = (a.admin1 === "Queensland");
+                    const bIsQLD = (b.admin1 === "Queensland");
+                    if (aIsQLD && !bIsQLD) return -1; // a comes first
+                    if (!aIsQLD && bIsQLD) return 1;  // b comes first
+                    return 0;
+                });
+
+                if (results.length === 1) {
                     // Only one result, proceed automatically
-                    const location = geoData.results[0];
+                    const location = results[0];
                     const displayParts = [];
                     if (location.name) displayParts.push(location.name);
-                    if (location.admin2) displayParts.push(location.admin2); // Added City/Region
+                    if (location.admin2) displayParts.push(location.admin2); 
                     if (location.admin1) displayParts.push(location.admin1);
                     else if (location.country) displayParts.push(location.country);
                     
@@ -463,7 +478,7 @@
                     fetchDataAndDisplay(location.latitude, location.longitude, name);
                 } else {
                     // Multiple results, show list for user to pick
-                    renderSearchResults(geoData.results);
+                    renderSearchResults(results);
                 }
 
             } catch (error) {
