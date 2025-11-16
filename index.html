@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Heat & Weather Check</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -15,17 +15,19 @@
         /* Apply Inter font */
         body {
             font-family: 'Inter', sans-serif;
+            /* Prevent pull-to-refresh on mobile if undesired, though usually harmless */
+            overscroll-behavior-y: none;
         }
         /* Simple spinning animation for loader */
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
         .loader {
-            border: 4px solid rgba(255, 255, 255, 0.3);
+            border: 3px solid rgba(255, 255, 255, 0.3);
             border-top-color: #fff;
             border-radius: 50%;
-            width: 1.5rem;
-            height: 1.5rem;
+            width: 1.25rem;
+            height: 1.25rem;
             animation: spin 1s linear infinite;
         }
         /* Custom Cream Color for "Caution" */
@@ -56,20 +58,25 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+        
+        /* Mobile optimizations */
+        input, button, select, textarea {
+            touch-action: manipulation; /* Improves touch response */
+        }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4 sm:p-6">
 
-    <div class="bg-white w-full max-w-md p-6 sm:p-8 rounded-2xl shadow-lg relative">
+    <div class="bg-white w-full max-w-md p-5 sm:p-8 rounded-2xl shadow-lg relative flex flex-col">
         
-        <header class="text-center mb-6">
-            <h1 class="text-3xl font-bold text-gray-800">Weather & Safety</h1>
-            <p class="text-gray-500 mt-1">EQL Heat Index Check</p>
+        <header class="text-center mb-5 sm:mb-6">
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">Weather & Safety</h1>
+            <p class="text-gray-500 mt-1 text-sm sm:text-base">EQL Heat Index Check</p>
         </header>
 
-        <main>
+        <main class="flex-grow">
             <!-- Check Button -->
-            <button id="checkButton" class="w-full bg-blue-600 text-white font-bold py-4 px-6 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300 ease-in-out flex items-center justify-center space-x-2">
+            <button id="checkButton" class="w-full bg-blue-600 text-white font-bold py-3 sm:py-4 px-6 rounded-xl shadow-md hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300 ease-in-out flex items-center justify-center space-x-2 active:scale-95">
                 <!-- Inlined "navigate-circle-outline" icon -->
                 <svg xmlns="http://www.w3.org/2000/svg" class="text-2xl w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z"></path>
@@ -79,13 +86,13 @@
             </button>
 
             <!-- Loading Spinner (hidden by default) -->
-            <div id="loader" class="hidden w-full bg-blue-600 text-white font-bold py-4 px-6 rounded-lg shadow-md flex items-center justify-center space-x-3">
+            <div id="loader" class="hidden w-full bg-blue-600 text-white font-bold py-3 sm:py-4 px-6 rounded-xl shadow-md flex items-center justify-center space-x-3">
                 <div class="loader"></div>
                 <span>Fetching Weather...</span>
             </div>
 
             <!-- Error Message Box (hidden by default) -->
-            <div id="errorBox" class="hidden mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            <div id="errorBox" class="hidden mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm">
                 <strong class="font-bold">Error:</strong>
                 <span id="errorMessage" class="block sm:inline"></span>
             </div>
@@ -95,32 +102,34 @@
                 <label for="locationInput" class="block text-sm font-medium text-gray-700">Or enter location manually:</label>
                 <div class="flex space-x-2">
                     <div class="relative flex-grow">
-                        <input type="text" id="locationInput" placeholder="Type to search (e.g., 'West End')" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" autocomplete="off">
+                        <!-- Text-base prevents iOS zoom on focus -->
+                        <input type="text" id="locationInput" placeholder="Type to search (e.g., 'West End')" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base appearance-none" autocomplete="off">
                         <!-- Loading indicator inside input -->
-                        <div id="searchSpinner" class="hidden absolute right-3 top-2.5">
-                            <div class="animate-spin h-4 w-4 border-2 border-blue-500 rounded-full border-t-transparent"></div>
+                        <div id="searchSpinner" class="hidden absolute right-3 top-3.5">
+                            <div class="animate-spin h-5 w-5 border-2 border-blue-500 rounded-full border-t-transparent"></div>
                         </div>
                     </div>
-                    <button id="searchButton" class="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                    <button id="searchButton" class="hidden px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                        <!-- Hidden on mobile as auto-search is preferred, but kept for fallback -->
                         Search
                     </button>
                 </div>
                 <!-- Search Results Dropdown -->
-                <ul id="searchResultsList" class="hidden absolute z-50 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto text-sm">
+                <ul id="searchResultsList" class="hidden absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-xl mt-1 max-h-48 sm:max-h-60 overflow-y-auto text-base sm:text-sm">
                     <!-- List items injected via JS -->
                 </ul>
             </div>
 
             <!-- Results Section (hidden by default) -->
-            <div id="results" class="hidden mt-8 space-y-6">
+            <div id="results" class="hidden mt-6 sm:mt-8 space-y-5 sm:space-y-6">
                 
                 <!-- Location with Edit Button -->
                 <div class="flex flex-col items-center">
-                    <div class="flex items-center justify-center gap-2 text-center">
-                        <h2 class="text-xl font-semibold text-gray-700" id="location"></h2>
+                    <div class="flex items-center justify-center gap-2 text-center px-2">
+                        <h2 class="text-lg sm:text-xl font-semibold text-gray-700 leading-tight" id="location"></h2>
                         <!-- Edit Pencil Icon -->
-                        <button id="editLocationBtn" class="text-gray-400 hover:text-blue-600 focus:outline-none transition-colors p-1" aria-label="Change Location" title="Change Location">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <button id="editLocationBtn" class="text-gray-400 hover:text-blue-600 focus:outline-none transition-colors p-2 -mr-2" aria-label="Change Location" title="Change Location">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                             </svg>
                         </button>
@@ -129,51 +138,52 @@
                 </div>
 
                 <!-- Main Warning -->
-                <div id="warningBox" class="relative p-6 rounded-2xl shadow-md text-center border-2 border-transparent transition-colors duration-300">
+                <div id="warningBox" class="relative p-5 sm:p-6 rounded-2xl shadow-md text-center border-2 border-transparent transition-colors duration-300">
                     <!-- Info Button -->
-                    <button id="infoButton" class="absolute top-3 right-3 p-1 rounded-full hover:bg-black hover:bg-opacity-10 focus:outline-none transition-colors" aria-label="More Info">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <button id="infoButton" class="absolute top-2 right-2 p-2 rounded-full hover:bg-black hover:bg-opacity-10 focus:outline-none transition-colors" aria-label="More Info">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </button>
 
-                    <p class="text-sm font-medium uppercase tracking-wider opacity-80 mb-1">Feels Like</p>
-                    <h3 class="text-5xl font-bold mb-2" id="feelsLikeTemp"></h3>
-                    <p class="text-3xl font-bold mt-1 uppercase tracking-wide" id="warningLevel"></p>
-                    <p class="text-lg font-medium mt-2 opacity-90" id="warningMessage"></p>
-                    <p class="text-xs mt-2 opacity-70">(Tap the ⓘ icon for required actions)</p>
+                    <p class="text-xs sm:text-sm font-medium uppercase tracking-wider opacity-80 mb-1">Feels Like</p>
+                    <!-- Responsive Text Size for Temp -->
+                    <h3 class="text-4xl sm:text-5xl font-bold mb-2" id="feelsLikeTemp"></h3>
+                    <p class="text-2xl sm:text-3xl font-bold mt-1 uppercase tracking-wide leading-tight" id="warningLevel"></p>
+                    <p class="text-base sm:text-lg font-medium mt-2 opacity-90 leading-snug" id="warningMessage"></p>
+                    <p class="text-[10px] sm:text-xs mt-3 opacity-70">(Tap the ⓘ icon for required actions)</p>
                 </div>
 
                 <!-- Other Details Grid -->
-                <div class="grid grid-cols-3 gap-3 pt-2">
+                <div class="grid grid-cols-3 gap-2 sm:gap-3 pt-2">
                     <!-- Actual Temp -->
-                    <div class="bg-gray-50 p-3 rounded-lg text-center shadow-sm flex flex-col justify-center">
-                        <p class="text-[10px] uppercase font-bold text-gray-400 mb-1">Temp</p>
-                        <p class="text-xl font-bold text-gray-800" id="actualTemp"></p>
+                    <div class="bg-gray-50 p-2 sm:p-3 rounded-lg text-center shadow-sm flex flex-col justify-center min-h-[70px]">
+                        <p class="text-[9px] sm:text-[10px] uppercase font-bold text-gray-400 mb-1">Temp</p>
+                        <p class="text-lg sm:text-xl font-bold text-gray-800" id="actualTemp"></p>
                     </div>
                     <!-- Humidity -->
-                    <div class="bg-gray-50 p-3 rounded-lg text-center shadow-sm flex flex-col justify-center">
-                        <p class="text-[10px] uppercase font-bold text-gray-400 mb-1">Humidity</p>
-                        <p class="text-xl font-bold text-gray-800" id="humidity"></p>
+                    <div class="bg-gray-50 p-2 sm:p-3 rounded-lg text-center shadow-sm flex flex-col justify-center min-h-[70px]">
+                        <p class="text-[9px] sm:text-[10px] uppercase font-bold text-gray-400 mb-1">Humidity</p>
+                        <p class="text-lg sm:text-xl font-bold text-gray-800" id="humidity"></p>
                     </div>
                     <!-- Rain -->
-                    <div class="bg-gray-50 p-3 rounded-lg text-center shadow-sm flex flex-col justify-center">
-                        <p class="text-[10px] uppercase font-bold text-gray-400 mb-1">Rain %</p>
-                        <p class="text-xl font-bold text-gray-800" id="rain"></p>
+                    <div class="bg-gray-50 p-2 sm:p-3 rounded-lg text-center shadow-sm flex flex-col justify-center min-h-[70px]">
+                        <p class="text-[9px] sm:text-[10px] uppercase font-bold text-gray-400 mb-1">Rain %</p>
+                        <p class="text-lg sm:text-xl font-bold text-gray-800" id="rain"></p>
                     </div>
                     <!-- Wind Speed -->
-                    <div class="bg-gray-50 p-3 rounded-lg text-center shadow-sm flex flex-col justify-center">
-                        <p class="text-[10px] uppercase font-bold text-gray-400 mb-1">Wind (km/h)</p>
-                        <p class="text-xl font-bold text-gray-800" id="wind"></p>
+                    <div class="bg-gray-50 p-2 sm:p-3 rounded-lg text-center shadow-sm flex flex-col justify-center min-h-[70px]">
+                        <p class="text-[9px] sm:text-[10px] uppercase font-bold text-gray-400 mb-1">Wind (km/h)</p>
+                        <p class="text-lg sm:text-xl font-bold text-gray-800" id="wind"></p>
                     </div>
                     <!-- Wind Gusts -->
-                    <div class="bg-gray-50 p-3 rounded-lg text-center shadow-sm flex flex-col justify-center">
-                        <p class="text-[10px] uppercase font-bold text-gray-400 mb-1">Gusts (km/h)</p>
-                        <p class="text-xl font-bold text-gray-800" id="gusts"></p>
+                    <div class="bg-gray-50 p-2 sm:p-3 rounded-lg text-center shadow-sm flex flex-col justify-center min-h-[70px]">
+                        <p class="text-[9px] sm:text-[10px] uppercase font-bold text-gray-400 mb-1">Gusts (km/h)</p>
+                        <p class="text-lg sm:text-xl font-bold text-gray-800" id="gusts"></p>
                     </div>
                      <!-- UV Index -->
-                     <div class="bg-gray-50 p-3 rounded-lg text-center shadow-sm flex flex-col justify-center">
-                        <p class="text-[10px] uppercase font-bold text-gray-400 mb-1">UV Index</p>
+                     <div class="bg-gray-50 p-2 sm:p-3 rounded-lg text-center shadow-sm flex flex-col justify-center min-h-[70px]">
+                        <p class="text-[9px] sm:text-[10px] uppercase font-bold text-gray-400 mb-1">UV Index</p>
                         <div id="uvIndex" class="leading-tight"></div>
                     </div>
                 </div>
@@ -199,7 +209,7 @@
                     </div>
                     
                     <!-- Horizontal Scroll Container -->
-                    <div class="overflow-x-auto scrollbar-hide py-4 px-1 -mx-1">
+                    <div class="overflow-x-auto scrollbar-hide py-4 px-1 -mx-1 touch-pan-x">
                         <div class="flex space-x-3" id="hourlyTimeline">
                             <!-- JS will inject hourly cards here -->
                         </div>
@@ -221,31 +231,31 @@
     </div>
 
     <!-- Modal Overlay -->
-    <div id="infoModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
+    <div id="infoModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50 p-4">
         <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
         
-        <div class="modal-container bg-white w-11/12 md:max-w-md mx-auto rounded shadow-lg z-50 overflow-y-auto max-h-[90vh]">
+        <div class="modal-container bg-white w-full max-w-md mx-auto rounded-xl shadow-lg z-50 overflow-y-auto max-h-[85vh] flex flex-col">
             
             <!-- Modal Content -->
             <div class="modal-content py-4 text-left px-6">
                 <!-- Title -->
                 <div class="flex justify-between items-center pb-3 border-b">
-                    <p class="text-2xl font-bold" id="modalTitle">Title</p>
-                    <div class="modal-close cursor-pointer z-50 p-2" id="closeModalBtn">
-                        <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                    <p class="text-xl sm:text-2xl font-bold" id="modalTitle">Title</p>
+                    <div class="modal-close cursor-pointer z-50 p-2 -mr-2" id="closeModalBtn">
+                        <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 18 18">
                             <path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path>
                         </svg>
                     </div>
                 </div>
 
                 <!-- Body -->
-                <div class="my-5 text-sm text-gray-700 space-y-3" id="modalBody">
+                <div class="my-5 text-sm text-gray-700 space-y-3 overflow-y-auto" id="modalBody">
                     <!-- Content injected by JS -->
                 </div>
 
                 <!-- Footer -->
                 <div class="flex justify-end pt-2">
-                    <button id="closeModalBottom" class="px-4 py-2 bg-blue-600 p-3 rounded-lg text-white hover:bg-blue-700">Close</button>
+                    <button id="closeModalBottom" class="w-full sm:w-auto px-6 py-3 bg-blue-600 rounded-lg text-white font-bold hover:bg-blue-700 active:bg-blue-800 transition-colors">Close</button>
                 </div>
             </div>
         </div>
@@ -348,7 +358,7 @@
             if (!infoModal.classList.contains('opacity-0')) {
                 const data = guidanceData[currentWarningLevel];
                 modalTitle.innerText = currentWarningLevel;
-                modalTitle.className = `text-2xl font-bold ${data.colorClass || 'text-gray-800'}`;
+                modalTitle.className = `text-xl sm:text-2xl font-bold ${data.colorClass || 'text-gray-800'}`;
                 
                 let html = `<p class="font-semibold">${data.intro}</p>`;
                 if (data.bullets) {
@@ -448,21 +458,21 @@
 
         async function geocodeAndFetch(cityName, forceSelection = false) {
             try {
-                // Fetch 20 results to catch "West End" in AU vs World
-                const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=20&format=json`;
+                // Request more results (count=100) to handle duplicates
+                const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=100&format=json`;
                 const response = await fetch(geoUrl);
                 if (!response.ok) throw new Error("Location search failed.");
                 
                 const geoData = await response.json();
                 let results = geoData.results || [];
 
-                // 1. STRICT FILTER: Only keep results where country_code is "AU"
+                // 1. STRICT FILTER: Only keep results where country_code is "AU" (Australia)
                 results = results.filter(loc => loc.country_code === 'AU');
 
                 searchSpinner.classList.add('hidden'); // Hide spinner
 
                 if (results.length === 0) {
-                    // If auto-typing, just show empty/message in dropdown, don't error out whole UI
+                    // If auto-typing, just show empty/message in dropdown
                     if (!forceSelection) {
                         searchResultsList.innerHTML = '<li class="px-4 py-3 text-gray-500 text-sm">No Australian locations found.</li>';
                         searchResultsList.classList.remove('hidden');
@@ -474,10 +484,13 @@
 
                 // 2. SORT: Queensland first
                 results.sort((a, b) => {
-                    const aIsQLD = (a.admin1 === "Queensland");
-                    const bIsQLD = (b.admin1 === "Queensland");
-                    if (aIsQLD && !bIsQLD) return -1; 
-                    if (!aIsQLD && bIsQLD) return 1; 
+                    const aState = (a.admin1 || "").toLowerCase();
+                    const bState = (b.admin1 || "").toLowerCase();
+                    const aIsQLD = aState.includes("queensland");
+                    const bIsQLD = bState.includes("queensland");
+                    
+                    if (aIsQLD && !bIsQLD) return -1; // a (QLD) comes first
+                    if (!aIsQLD && bIsQLD) return 1;  // b (QLD) comes first
                     return 0;
                 });
 
@@ -545,9 +558,11 @@
 
         async function fetchDataAndDisplay(lat, lon, manualCityName = null) {
             try {
+                // Show loader if not already shown
                 loader.classList.remove('hidden');
                 results.classList.add('hidden');
                 
+                // Fetch Weather
                 const weather = await getWeatherData(lat, lon);
                 
                 let city = manualCityName;
@@ -555,10 +570,14 @@
                     city = await getCityName(lat, lon);
                 }
 
+                // Current Warning
                 const warning = getWarningData(weather.current.apparent_temperature);
                 currentWarningLevel = warning.level;
 
+                // Display Main Data
                 displayResults(weather, warning, city);
+                
+                // Render Timeline
                 renderTimeline(weather.hourly);
 
             } catch (error) {
@@ -597,6 +616,7 @@
         function renderTimeline(hourly) {
             hourlyTimeline.innerHTML = "";
             
+            // Calculate nearest hour for highlighting (e.g. 1:56 -> 2:00, so 14:00)
             const now = new Date();
             let currentHourNum = now.getHours();
             if (now.getMinutes() >= 30) {
@@ -605,26 +625,32 @@
 
             for (let i = 0; i < hourly.time.length; i++) {
                 const timeStr = hourly.time[i];
-                const hourPart = timeStr.split('T')[1]; 
+                const hourPart = timeStr.split('T')[1]; // "07:00"
                 const hourNum = parseInt(hourPart.split(':')[0], 10);
 
+                // Filter for 7am to 4pm
                 if (hourNum >= 7 && hourNum <= 16) {
                     const feelsLike = Math.round(hourly.apparent_temperature[i]);
                     const rainProb = hourly.precipitation_probability[i];
                     
-                    let cardClass = "card-green";
+                    // Determine color for "Feels Like" timeline card
+                    let cardClass = "card-green"; // default < 27
                     if (feelsLike >= 52) cardClass = "card-red";
                     else if (feelsLike >= 40) cardClass = "card-orange";
                     else if (feelsLike >= 33) cardClass = "card-yellow";
                     else if (feelsLike >= 27) cardClass = "card-cream";
 
+                    // Check if this is the current/nearest hour
                     const isCurrent = (hourNum === currentHourNum);
+                    // NOTE: removed bg-white to keep the card color visible
                     const highlightClass = isCurrent ? "ring-2 ring-blue-600 ring-offset-1 scale-110 z-10" : "";
                     const timeBadge = isCurrent ? `<span class="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-[8px] px-1.5 py-0.5 rounded-full shadow-sm">NOW</span>` : "";
 
+                    // Highlight RAIN if > 50%
                     const rainColorClass = rainProb >= 50 ? "text-blue-600 font-extrabold" : "text-gray-600";
                     const rainIconClass = rainProb >= 50 ? "text-blue-600" : "text-gray-400";
 
+                    // Format time (e.g. "07:00" -> "7am")
                     const ampm = hourNum >= 12 ? 'pm' : 'am';
                     const displayHour = hourNum % 12 || 12; 
                     const timeLabel = `${displayHour}${ampm}`;
@@ -637,11 +663,13 @@
                         <span class="text-xl font-bold">${feelsLike}°</span>
                         <span class="text-[9px] opacity-70">Feels Like</span>
                         <div class="mt-2 flex items-center space-x-1 opacity-90">
+                             <!-- Rain Umbrella Icon -->
                              <svg class="w-3 h-3 ${rainIconClass}" fill="currentColor" viewBox="0 0 24 24"><path d="M12 6c-3.87 0-7 3.13-7 7h14c0-3.87-3.13-7-7-7zm0-2c5.2 0 9.6 3.4 10.8 8H21v1c0 3.1-2.3 5.7-5.3 6.3v2.7h-2V19h-1.7v3h-2v-3H8v-2.7C5 15.7 2.7 13.1 2.7 10v-1h1.2C5.1 7.4 9.5 4 14.7 4h-2.7z"/></svg>
                              <span class="text-xs font-bold ${rainColorClass}">${rainProb}%</span>
                         </div>
                     `;
                     
+                    // Auto-scroll to the current hour if found
                     if (isCurrent) {
                         setTimeout(() => {
                             card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
@@ -721,6 +749,7 @@
         function displayResults(weather, warning, city) {
             locationEl.innerText = city;
             
+            // Display current time
             const now = new Date();
             currentTimeLabel.innerText = `Checked at ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
             
@@ -733,10 +762,12 @@
             actualTempEl.innerText = `${weather.current.temperature}°C`;
             humidityEl.innerText = `${weather.current.humidity}%`;
             
+            // Update Wind label to match Gusts (remove unit from value)
             windEl.innerText = `${weather.current.wind_speed}`;
             rainEl.innerText = `${weather.current.rain_probability}%`;
             gustsEl.innerText = `${weather.current.wind_gusts}`;
             
+            // UV Logic with text description
             const uv = weather.current.uv_index;
             let uvText = "Low";
             let uvClass = "text-green-600";
@@ -771,6 +802,7 @@
             manualInputBox.classList.remove('hidden');
             loader.classList.add('hidden');
             checkButton.classList.remove('hidden');
+            // Hide list if error happens
             searchResultsList.classList.add('hidden');
         }
     </script>
