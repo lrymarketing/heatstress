@@ -104,10 +104,18 @@
             <!-- Results Section (hidden by default) -->
             <div id="results" class="hidden mt-8 space-y-6">
                 
-                <!-- Location -->
-                <div>
-                    <h2 class="text-center text-xl font-semibold text-gray-700" id="location"></h2>
-                    <p class="text-center text-xs text-gray-400 mt-1" id="currentTimeLabel"></p>
+                <!-- Location with Edit Button -->
+                <div class="flex flex-col items-center">
+                    <div class="flex items-center justify-center gap-2">
+                        <h2 class="text-xl font-semibold text-gray-700" id="location"></h2>
+                        <!-- Edit Pencil Icon -->
+                        <button id="editLocationBtn" class="text-gray-400 hover:text-blue-600 focus:outline-none transition-colors p-1" aria-label="Change Location" title="Change Location">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1" id="currentTimeLabel"></p>
                 </div>
 
                 <!-- Main Warning -->
@@ -244,6 +252,7 @@
         const locationInput = document.getElementById('locationInput');
         const searchButton = document.getElementById('searchButton');
         const currentTimeLabel = document.getElementById('currentTimeLabel');
+        const editLocationBtn = document.getElementById('editLocationBtn'); // New button
 
         const locationEl = document.getElementById('location');
         const feelsLikeTempEl = document.getElementById('feelsLikeTemp');
@@ -373,6 +382,18 @@
             results.classList.add('hidden');
 
             geocodeAndFetch(cityName);
+        });
+
+        // Edit Button Logic
+        editLocationBtn.addEventListener('click', () => {
+            // Hide results
+            results.classList.add('hidden');
+            // Show initial search buttons again
+            checkButton.classList.remove('hidden');
+            manualInputBox.classList.remove('hidden');
+            // Clear input focus for convenience
+            locationInput.value = '';
+            locationInput.focus();
         });
 
         function handleGeoSuccess(position) {
@@ -510,7 +531,8 @@
 
                     // Check if this is the current/nearest hour
                     const isCurrent = (hourNum === currentHourNum);
-                    const highlightClass = isCurrent ? "ring-2 ring-blue-600 ring-offset-1 scale-110 z-10 bg-white" : "";
+                    // NOTE: removed bg-white to keep the card color visible
+                    const highlightClass = isCurrent ? "ring-2 ring-blue-600 ring-offset-1 scale-110 z-10" : "";
                     const timeBadge = isCurrent ? `<span class="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-[8px] px-1.5 py-0.5 rounded-full shadow-sm">NOW</span>` : "";
 
                     // Highlight RAIN if > 50%
