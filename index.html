@@ -10,8 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Icons are now inline SVGs, no external scripts needed -->
-
+    
     <style>
         /* Apply Inter font */
         body {
@@ -29,6 +28,11 @@
             height: 1.5rem;
             animation: spin 1s linear infinite;
         }
+        /* Custom Cream Color for "Caution" */
+        .bg-cream {
+            background-color: #FFF8DC; /* Cornsilk/Cream */
+            color: #5D4037; /* Dark Brown text for contrast */
+        }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
@@ -37,7 +41,7 @@
         
         <header class="text-center mb-6">
             <h1 class="text-3xl font-bold text-gray-800">Weather & Safety</h1>
-            <p class="text-gray-500 mt-1">Check your local conditions and heat risk.</p>
+            <p class="text-gray-500 mt-1">EQL Heat Index Check</p>
         </header>
 
         <main>
@@ -83,33 +87,34 @@
                 </div>
 
                 <!-- Main Warning -->
-                <div id="warningBox" class="p-6 rounded-2xl shadow-md text-center">
-                    <h3 class="text-4xl font-bold" id="feelsLikeTemp"></h3>
-                    <p class="text-2xl font-semibold mt-1" id="warningLevel"></p>
-                    <p class="text-lg opacity-80" id="warningMessage"></p>
+                <div id="warningBox" class="p-6 rounded-2xl shadow-md text-center border-2 border-transparent transition-colors duration-300">
+                    <p class="text-sm font-medium uppercase tracking-wider opacity-80 mb-1">Feels Like</p>
+                    <h3 class="text-5xl font-bold mb-2" id="feelsLikeTemp"></h3>
+                    <p class="text-3xl font-bold mt-1 uppercase tracking-wide" id="warningLevel"></p>
+                    <p class="text-lg font-medium mt-2 opacity-90" id="warningMessage"></p>
                 </div>
 
                 <!-- Other Details Grid -->
                 <div class="grid grid-cols-2 gap-4 pt-4">
                     <!-- Actual Temp -->
                     <div class="bg-gray-50 p-4 rounded-lg text-center shadow-sm">
-                        <p class="text-sm font-medium text-gray-500">Actual Temp</p>
-                        <p class="text-3xl font-bold text-gray-800" id="actualTemp"></p>
+                        <p class="text-xs uppercase font-bold text-gray-400 mb-1">Actual Temp</p>
+                        <p class="text-2xl font-bold text-gray-800" id="actualTemp"></p>
                     </div>
                     <!-- Humidity -->
                     <div class="bg-gray-50 p-4 rounded-lg text-center shadow-sm">
-                        <p class="text-sm font-medium text-gray-500">Humidity</p>
-                        <p class="text-3xl font-bold text-gray-800" id="humidity"></p>
+                        <p class="text-xs uppercase font-bold text-gray-400 mb-1">Humidity</p>
+                        <p class="text-2xl font-bold text-gray-800" id="humidity"></p>
                     </div>
                     <!-- Wind -->
                     <div class="bg-gray-50 p-4 rounded-lg text-center shadow-sm">
-                        <p class="text-sm font-medium text-gray-500">Wind</p>
-                        <p class="text-3xl font-bold text-gray-800" id="wind"></p>
+                        <p class="text-xs uppercase font-bold text-gray-400 mb-1">Wind</p>
+                        <p class="text-2xl font-bold text-gray-800" id="wind"></p>
                     </div>
                     <!-- Chance of Rain -->
                     <div class="bg-gray-50 p-4 rounded-lg text-center shadow-sm">
-                        <p class="text-sm font-medium text-gray-500">Chance of Rain</p>
-                        <p class="text-3xl font-bold text-gray-800" id="rain"></p>
+                        <p class="text-xs uppercase font-bold text-gray-400 mb-1">Rain Chance</p>
+                        <p class="text-2xl font-bold text-gray-800" id="rain"></p>
                     </div>
                 </div>
 
@@ -130,7 +135,14 @@
 
         const locationEl = document.getElementById('location');
         const feelsLikeTempEl = document.getElementById('feelsLikeTemp');
+        const warningLevelEl = document.getElementById('warningLevel');
         const warningMessageEl = document.getElementById('warningMessage');
+        const warningBoxEl = document.getElementById('warningBox');
+        
+        const actualTempEl = document.getElementById('actualTemp');
+        const humidityEl = document.getElementById('humidity');
+        const windEl = document.getElementById('wind');
+        const rainEl = document.getElementById('rain');
 
         checkButton.addEventListener('click', () => {
             // Show loader, hide everything else
@@ -138,21 +150,25 @@
             loader.classList.remove('hidden');
             results.classList.add('hidden');
             errorBox.classList.add('hidden');
-            manualInputBox.classList.add('hidden'); // Hide manual input
+            manualInputBox.classList.add('hidden'); 
             
             // Try to get precise location
-            navigator.geolocation.getCurrentPosition(handleGeoSuccess, handleGeoError, { enableHighAccuracy: true });
+            if (!navigator.geolocation) {
+                // Fallback immediately if geolocation not supported
+                fallbackGetLocation();
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(handleGeoSuccess, handleGeoError, { enableHighAccuracy: true, timeout: 10000 });
         });
 
         searchButton.addEventListener('click', () => {
             const cityName = locationInput.value;
             if (!cityName) {
                 showError("Please enter a city or suburb name.");
-                manualInputBox.classList.remove('hidden'); // Re-show the box
                 return;
             }
             
-            // Show loader, hide other UI
+            // Show loader
             loader.classList.remove('hidden');
             checkButton.classList.add('hidden');
             errorBox.classList.add('hidden');
@@ -163,110 +179,84 @@
         });
 
         function handleGeoSuccess(position) {
-            // 1. Success with precise location
             fetchDataAndDisplay(position.coords.latitude, position.coords.longitude);
         }
 
         function handleGeoError(error) {
-            let message = "Unable to retrieve your location.";
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    message = "Please allow location access. Note: Geolocation requires a secure (HTTPS) connection. If you are in a preview, you may need to open this file directly in your browser.";
-                    showError(message); // Show error and stop
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                case error.TIMEOUT:
-                    // 2. Precise location failed, try IP fallback
-                    fallbackGetLocation();
-                    break;
-                default:
-                    showError(message); // Show generic error
-            }
+            // On error, try IP fallback
+            console.warn("Geolocation failed, trying IP fallback:", error.message);
+            fallbackGetLocation();
         }
 
         async function fallbackGetLocation() {
             try {
-                // 3. Use IP-based location as a fallback
                 const response = await fetch('https://ipapi.co/json/');
-                if (!response.ok) {
-                    throw new Error('IP location service failed.');
-                }
+                if (!response.ok) throw new Error('IP service failed');
                 const data = await response.json();
+                
                 if (data.latitude && data.longitude) {
-                    // 4. Got IP location, now fetch weather
-                    fetchDataAndDisplay(data.latitude, data.longitude);
+                    fetchDataAndDisplay(data.latitude, data.longitude, data.city);
                 } else {
-                    throw new Error('Could not determine location from IP.');
+                    throw new Error('Invalid IP data');
                 }
             } catch (error) {
                 console.error("IP Fallback Error:", error);
-                showError("Unable to retrieve your location. Precise location failed, and IP-based fallback also failed.");
+                // If IP fallback fails, show error and manual input
+                showError("Could not automatically detect location. Please enter it manually.");
             }
         }
 
         async function geocodeAndFetch(cityName) {
             try {
-                // 1. Geocode city name to get lat/lon
                 const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&format=json`;
                 const response = await fetch(geoUrl);
-                if (!response.ok) {
-                    throw new Error("Location search service failed.");
-                }
+                if (!response.ok) throw new Error("Location search failed.");
+                
                 const geoData = await response.json();
                 if (!geoData.results || geoData.results.length === 0) {
-                    throw new Error(`Could not find a location named "${cityName}".`);
+                    throw new Error(`Could not find "${cityName}".`);
                 }
 
                 const location = geoData.results[0];
-                const lat = location.latitude;
-                const lon = location.longitude;
-                // Construct a clean name, e.g., "Sydney, New South Wales"
                 const name = `${location.name}, ${location.admin1 || location.country}`;
-
-                // 2. Fetch data, passing in the name we just found
-                fetchDataAndDisplay(lat, lon, name);
+                fetchDataAndDisplay(location.latitude, location.longitude, name);
 
             } catch (error) {
-                console.error("Geocoding Error:", error);
                 showError(error.message);
             }
         }
 
         async function fetchDataAndDisplay(lat, lon, manualCityName = null) {
             try {
-                // 2. Fetch Weather Data
-                const weatherData = await getWeatherData(lat, lon);
+                // 1. Fetch Weather
+                const weather = await getWeatherData(lat, lon);
                 
-                // 3. Get City Name (if not already provided by manual search)
-                const city = manualCityName ? manualCityName : await getCityName(lat, lon);
+                // 2. Get City Name (if we don't have it yet)
+                let city = manualCityName;
+                if (!city) {
+                    city = await getCityName(lat, lon);
+                }
 
-                // 4. Determine Warning Level
-                const warning = getWarningData(weatherData.apparent_temperature);
+                // 3. Calculate Warning
+                const warning = getWarningData(weather.apparent_temperature);
 
-                // 5. Display Results
-                displayResults(weatherData, warning, city);
+                // 4. Display
+                displayResults(weather, warning, city);
 
             } catch (error) {
-                console.error("Error in weather fetching process:", error);
-                showError(error.message || "Could not fetch weather data.");
+                console.error(error);
+                showError("Could not fetch weather data. Please try again.");
             }
         }
 
         async function getWeatherData(lat, lon) {
             const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,wind_speed_10m&timezone=auto`;
-            
             const response = await fetch(apiUrl);
-            if (!response.ok) {
-                throw new Error("Weather data service is currently unavailable.");
-            }
-            
+            if (!response.ok) throw new Error("Weather API error");
             const data = await response.json();
+            
+            if (!data.current) throw new Error("No current weather data");
 
-            if (!data.current) {
-                throw new Error("Could not parse weather data.");
-            }
-
-            // Return a clean object
             return {
                 temperature: Math.round(data.current.temperature_2m),
                 humidity: data.current.relative_humidity_2m,
@@ -278,100 +268,89 @@
 
         async function getCityName(lat, lon) {
             try {
-                // Using a free, privacy-friendly reverse geocoding API
                 const apiUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`;
-                const response = await fetch(apiUrl, {
-                    headers: { 'Accept-Language': 'en-US' }
-                });
+                const response = await fetch(apiUrl, { headers: { 'Accept-Language': 'en-US' } });
                 if (!response.ok) return "Your Location";
-
                 const data = await response.json();
-                // Try to find suburb, city, or town
-                const name = data.address.suburb || data.address.city || data.address.town || data.address.village;
-                const state = data.address.state || "";
-                
-                if (name) {
-                    return `${name}, ${state}`;
-                } else {
-                    return "Your Current Location";
-                }
-            } catch (error) {
-                console.error("Error fetching city name:", error);
-                return "Your Current Location"; // Fallback
+                return data.address.suburb || data.address.city || data.address.town || "Your Location";
+            } catch (e) {
+                return "Your Location";
             }
         }
 
-        function getWarningData(feelsLikeTemp) {
-            // Logic based on the provided image's "Feels Like" temperature ranges
-            // Apparent Temperature thresholds in Celsius
-            if (feelsLikeTemp >= 52) {
+        function getWarningData(feelsLike) {
+            // Thresholds based on EQL Heat Index / Safety Standards
+            // < 27: Low
+            // 27 - 32: Caution (Cream)
+            // 33 - 39: Extreme Caution (Yellow)
+            // 40 - 51: Danger (Orange)
+            // >= 52: Extreme Danger (Red)
+
+            if (feelsLike >= 52) {
                 return {
                     level: "Extreme Danger",
-                    message: "Heat stroke is imminent. Stay cool.",
-                    bgColor: "bg-red-800", // Dark Red
-                    textColor: "text-white"
+                    message: "Critical heat stress risk. Stop work if unsafe.",
+                    bgClass: "bg-red-600", // Red
+                    textClass: "text-white"
                 };
-            } else if (feelsLikeTemp >= 40) {
+            } else if (feelsLike >= 40) {
                 return {
                     level: "Danger",
-                    message: "Heat stroke is likely with prolonged exposure.",
-                    bgColor: "bg-red-600", // Red
-                    textColor: "text-white"
+                    message: "Heat stroke likely. Mandatory rest breaks.",
+                    bgClass: "bg-orange-500", // Orange
+                    textClass: "text-white"
                 };
-            } else if (feelsLikeTemp >= 33) {
+            } else if (feelsLike >= 33) {
                 return {
                     level: "Extreme Caution",
-                    message: "Take breaks and hydrate frequently.",
-                    bgColor: "bg-orange-500", // Orange
-                    textColor: "text-white"
+                    message: "Take frequent breaks. Monitor hydration.",
+                    bgClass: "bg-yellow-400", // Yellow
+                    textClass: "text-gray-900"
                 };
-            } else if (feelsLikeTemp >= 27) {
+            } else if (feelsLike >= 27) {
                 return {
                     level: "Caution",
-                    message: "Fatigue is possible with prolonged exposure.",
-                    bgColor: "bg-yellow-400", // Yellow
-                    textColor: "text-gray-800"
+                    message: "Plan work carefully. Stay hydrated.",
+                    bgClass: "bg-cream", // Custom Cream class defined in CSS
+                    textClass: "text-yellow-900"
                 };
             } else {
                 return {
                     level: "Low Risk",
-                    message: "Conditions are generally comfortable.",
-                    bgColor: "bg-green-500", // Green
-                    textColor: "text-white"
+                    message: "Conditions are within standard limits.",
+                    bgClass: "bg-green-500", // Green
+                    textClass: "text-white"
                 };
             }
         }
 
         function displayResults(weather, warning, city) {
-            // Set Location
             locationEl.innerText = city;
-
-            // Set Main Warning Box
+            
             feelsLikeTempEl.innerText = `${weather.apparent_temperature}°C`;
             warningLevelEl.innerText = warning.level;
             warningMessageEl.innerText = warning.message;
-
-            // Apply dynamic colors
-            warningBoxEl.className = `p-6 rounded-2xl shadow-md text-center ${warning.bgColor} ${warning.textColor}`;
             
-            // Set Other Details
+            // Update Warning Box Colors
+            // Remove old classes first to be safe, though overwriting className works too
+            warningBoxEl.className = `p-6 rounded-2xl shadow-md text-center border-2 border-transparent transition-colors duration-300 ${warning.bgClass} ${warning.textClass}`;
+
             actualTempEl.innerText = `${weather.temperature}°C`;
             humidityEl.innerText = `${weather.humidity}%`;
             windEl.innerText = `${weather.wind_speed} km/h`;
             rainEl.innerText = `${weather.rain_probability}%`;
 
-            // Show results and hide loader
             loader.classList.add('hidden');
             results.classList.remove('hidden');
-            checkButton.classList.remove('hidden'); // Show button again
+            checkButton.classList.remove('hidden');
         }
 
         function showError(message) {
             errorMessage.innerText = message;
             errorBox.classList.remove('hidden');
-            manualInputBox.classList.remove('hidden'); // <-- Show manual input on error!
+            manualInputBox.classList.remove('hidden');
             loader.classList.add('hidden');
-            checkButton.classList.remove('hidden'); // Show button again
+            checkButton.classList.remove('hidden');
         }
     </script>
 </body>
