@@ -33,6 +33,12 @@
             background-color: #FFF8DC; /* Cornsilk/Cream */
             color: #5D4037; /* Dark Brown text for contrast */
         }
+        /* Timeline colors matching the main logic */
+        .card-cream { background-color: #FFF8DC; border-color: #e6dbc0; color: #5D4037; }
+        .card-yellow { background-color: #fef08a; border-color: #fde047; color: #854d0e; }
+        .card-orange { background-color: #fed7aa; border-color: #fdba74; color: #9a3412; }
+        .card-red { background-color: #fecaca; border-color: #fca5a5; color: #991b1b; }
+        .card-green { background-color: #dcfce7; border-color: #86efac; color: #166534; }
         
         /* Modal transition */
         .modal {
@@ -120,7 +126,7 @@
                     <p class="text-xs mt-2 opacity-70">(Tap the ⓘ icon for required actions)</p>
                 </div>
 
-                <!-- Other Details Grid (Updated with Gusts & UV) -->
+                <!-- Other Details Grid -->
                 <div class="grid grid-cols-3 gap-3 pt-2">
                     <!-- Actual Temp -->
                     <div class="bg-gray-50 p-3 rounded-lg text-center shadow-sm">
@@ -142,29 +148,39 @@
                         <p class="text-[10px] uppercase font-bold text-gray-400 mb-1">Wind</p>
                         <p class="text-xl font-bold text-gray-800" id="wind"></p>
                     </div>
-                    <!-- Wind Gusts (NEW) -->
+                    <!-- Wind Gusts (Updated Layout) -->
                     <div class="bg-gray-50 p-3 rounded-lg text-center shadow-sm">
-                        <p class="text-[10px] uppercase font-bold text-gray-400 mb-1">Gusts</p>
+                        <p class="text-[10px] uppercase font-bold text-gray-400 mb-1">Gusts (km/h)</p>
                         <p class="text-xl font-bold text-gray-800" id="gusts"></p>
                     </div>
-                     <!-- UV Index (NEW) -->
+                     <!-- UV Index -->
                      <div class="bg-gray-50 p-3 rounded-lg text-center shadow-sm">
                         <p class="text-[10px] uppercase font-bold text-gray-400 mb-1">UV Index</p>
                         <p class="text-xl font-bold text-gray-800" id="uvIndex"></p>
                     </div>
                 </div>
 
-                <!-- Work Day Timeline (NEW) -->
+                <!-- Work Day Timeline -->
                 <div class="pt-4 border-t border-gray-200">
-                    <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Work Day Plan (7am - 4pm)
-                    </h3>
+                    <div class="flex justify-between items-end mb-3">
+                        <h3 class="text-sm font-bold text-gray-700 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Work Day (7am-4pm)
+                        </h3>
+                        <!-- Risk Legend -->
+                        <div class="flex space-x-1 text-[8px] font-medium text-gray-500">
+                            <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-[#dcfce7] border border-green-300 mr-0.5"></span>Low</span>
+                            <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-[#FFF8DC] border border-yellow-700 mr-0.5"></span>Caution</span>
+                            <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-yellow-200 border border-yellow-400 mr-0.5"></span>Ext</span>
+                            <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-orange-200 border border-orange-400 mr-0.5"></span>Dgr</span>
+                            <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-red-200 border border-red-400 mr-0.5"></span>Ext Dgr</span>
+                        </div>
+                    </div>
                     
                     <!-- Horizontal Scroll Container -->
-                    <div class="overflow-x-auto scrollbar-hide pb-2">
+                    <div class="overflow-x-auto scrollbar-hide pb-2 px-1">
                         <div class="flex space-x-3" id="hourlyTimeline">
                             <!-- JS will inject hourly cards here -->
                         </div>
@@ -253,7 +269,7 @@
 
         let currentWarningLevel = "";
 
-        // Guidance Data (Unchanged)
+        // Guidance Data
         const guidanceData = {
             "Caution": {
                 colorClass: "text-yellow-900",
@@ -438,7 +454,6 @@
         }
 
         async function getWeatherData(lat, lon) {
-            // Updated API call: Added wind_gusts_10m to current, and uv_index to hourly
             const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,apparent_temperature,precipitation_probability,uv_index&timezone=auto&forecast_days=1`;
             
             const response = await fetch(apiUrl);
@@ -447,9 +462,7 @@
             
             if (!data.current) throw new Error("No current weather data");
 
-            // Get current UV from hourly array (OpenMeteo puts UV in hourly, not current)
-            // Find the index for the current hour
-            const currentHourIso = data.current.time.substring(0, 13); // Matches YYYY-MM-DDTHH
+            const currentHourIso = data.current.time.substring(0, 13);
             const hourIndex = data.hourly.time.findIndex(t => t.startsWith(currentHourIso));
             const currentUV = hourIndex !== -1 ? data.hourly.uv_index[hourIndex] : 0;
 
@@ -459,20 +472,24 @@
                     humidity: data.current.relative_humidity_2m,
                     apparent_temperature: Math.round(data.current.apparent_temperature),
                     wind_speed: Math.round(data.current.wind_speed_10m),
-                    wind_gusts: Math.round(data.current.wind_gusts_10m), // NEW
+                    wind_gusts: Math.round(data.current.wind_gusts_10m),
                     rain_probability: data.current.precipitation_probability,
-                    uv_index: currentUV // NEW
+                    uv_index: currentUV
                 },
-                hourly: data.hourly // Pass raw hourly data for processing
+                hourly: data.hourly
             };
         }
 
         function renderTimeline(hourly) {
             hourlyTimeline.innerHTML = "";
             
-            // We want hours 07:00 to 16:00 (7am to 4pm)
-            // The API returns ISO strings: "2023-10-27T07:00"
-            
+            // Calculate nearest hour for highlighting (e.g. 1:56 -> 2:00, so 14:00)
+            const now = new Date();
+            let currentHourNum = now.getHours();
+            if (now.getMinutes() >= 30) {
+                currentHourNum += 1;
+            }
+
             for (let i = 0; i < hourly.time.length; i++) {
                 const timeStr = hourly.time[i];
                 const hourPart = timeStr.split('T')[1]; // "07:00"
@@ -484,28 +501,44 @@
                     const rainProb = hourly.precipitation_probability[i];
                     
                     // Determine color for "Feels Like" timeline card
-                    let bgClass = "bg-green-100 border-green-200";
-                    if (feelsLike >= 52) bgClass = "bg-red-100 border-red-300";
-                    else if (feelsLike >= 40) bgClass = "bg-orange-100 border-orange-300";
-                    else if (feelsLike >= 33) bgClass = "bg-yellow-100 border-yellow-300";
-                    else if (feelsLike >= 27) bgClass = "bg-orange-50 border-orange-200"; // Cream approx
+                    // Using class names defined in <style>
+                    let cardClass = "card-green"; // default < 27
+                    if (feelsLike >= 52) cardClass = "card-red";
+                    else if (feelsLike >= 40) cardClass = "card-orange";
+                    else if (feelsLike >= 33) cardClass = "card-yellow";
+                    else if (feelsLike >= 27) cardClass = "card-cream";
+
+                    // Check if this is the current/nearest hour
+                    const isCurrent = (hourNum === currentHourNum);
+                    const highlightClass = isCurrent ? "ring-2 ring-blue-600 ring-offset-1 scale-105 z-10 bg-white" : "";
+                    const timeBadge = isCurrent ? `<span class="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-[8px] px-1.5 py-0.5 rounded-full">NOW</span>` : "";
 
                     // Format time (e.g. "07:00" -> "7am")
                     const ampm = hourNum >= 12 ? 'pm' : 'am';
-                    const displayHour = hourNum % 12 || 12; // Convert 0 or 12 to 12
+                    const displayHour = hourNum % 12 || 12; 
                     const timeLabel = `${displayHour}${ampm}`;
 
                     const card = document.createElement('div');
-                    card.className = `flex-shrink-0 w-24 p-2 rounded-xl border ${bgClass} flex flex-col items-center justify-center text-center shadow-sm`;
+                    card.className = `relative flex-shrink-0 w-24 p-2 rounded-xl border flex flex-col items-center justify-center text-center shadow-sm transition-transform ${cardClass} ${highlightClass}`;
                     card.innerHTML = `
-                        <span class="text-xs font-bold text-gray-500 mb-1">${timeLabel}</span>
-                        <span class="text-lg font-bold text-gray-800">${feelsLike}°</span>
-                        <span class="text-[10px] text-gray-500">Feels Like</span>
-                        <div class="mt-2 flex items-center space-x-1">
-                             <svg class="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
-                             <span class="text-xs font-semibold text-blue-600">${rainProb}%</span>
+                        ${timeBadge}
+                        <span class="text-xs font-bold opacity-70 mb-1">${timeLabel}</span>
+                        <span class="text-xl font-bold">${feelsLike}°</span>
+                        <span class="text-[9px] opacity-70">Feels Like</span>
+                        <div class="mt-2 flex items-center space-x-1 opacity-90">
+                             <!-- Rain Umbrella Icon -->
+                             <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 6c-3.87 0-7 3.13-7 7h14c0-3.87-3.13-7-7-7zm0-2c5.2 0 9.6 3.4 10.8 8H21v1c0 3.1-2.3 5.7-5.3 6.3v2.7h-2V19h-1.7v3h-2v-3H8v-2.7C5 15.7 2.7 13.1 2.7 10v-1h1.2C5.1 7.4 9.5 4 14.7 4h-2.7z"/></svg>
+                             <span class="text-xs font-bold">${rainProb}%</span>
                         </div>
                     `;
+                    
+                    // Auto-scroll to the current hour if found
+                    if (isCurrent) {
+                        setTimeout(() => {
+                            card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                        }, 500);
+                    }
+
                     hourlyTimeline.appendChild(card);
                 }
             }
@@ -593,8 +626,8 @@
             humidityEl.innerText = `${weather.current.humidity}%`;
             windEl.innerText = `${weather.current.wind_speed} km/h`;
             rainEl.innerText = `${weather.current.rain_probability}%`;
-            gustsEl.innerText = `${weather.current.wind_gusts} km/h`; // NEW
-            uvIndexEl.innerText = `${weather.current.uv_index}`; // NEW
+            gustsEl.innerText = `${weather.current.wind_gusts}`; // Removed unit, added to label
+            uvIndexEl.innerText = `${weather.current.uv_index}`;
 
             loader.classList.add('hidden');
             results.classList.remove('hidden');
