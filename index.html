@@ -33,11 +33,19 @@
             background-color: #FFF8DC; /* Cornsilk/Cream */
             color: #5D4037; /* Dark Brown text for contrast */
         }
+        
+        /* Modal transition */
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        body.modal-active {
+            overflow: hidden;
+        }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
 
-    <div class="bg-white w-full max-w-md p-6 sm:p-8 rounded-2xl shadow-lg">
+    <div class="bg-white w-full max-w-md p-6 sm:p-8 rounded-2xl shadow-lg relative">
         
         <header class="text-center mb-6">
             <h1 class="text-3xl font-bold text-gray-800">Weather & Safety</h1>
@@ -71,7 +79,7 @@
             <div id="manualInputBox" class="hidden mt-4 space-y-2">
                 <label for="locationInput" class="block text-sm font-medium text-gray-700">Or enter location manually:</label>
                 <div class="flex space-x-2">
-                    <input type="text" id="locationInput" placeholder="e.g., 'Sydney' or '90210'" class="flex-grow block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <input type="text" id="locationInput" placeholder="e.g., 'Kirwan'" class="flex-grow block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                     <button id="searchButton" class="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400">
                         Search
                     </button>
@@ -87,11 +95,19 @@
                 </div>
 
                 <!-- Main Warning -->
-                <div id="warningBox" class="p-6 rounded-2xl shadow-md text-center border-2 border-transparent transition-colors duration-300">
+                <div id="warningBox" class="relative p-6 rounded-2xl shadow-md text-center border-2 border-transparent transition-colors duration-300">
+                    <!-- Info Button (Absolute positioned top right) -->
+                    <button id="infoButton" class="absolute top-3 right-3 p-1 rounded-full hover:bg-black hover:bg-opacity-10 focus:outline-none transition-colors" aria-label="More Info">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </button>
+
                     <p class="text-sm font-medium uppercase tracking-wider opacity-80 mb-1">Feels Like</p>
                     <h3 class="text-5xl font-bold mb-2" id="feelsLikeTemp"></h3>
                     <p class="text-3xl font-bold mt-1 uppercase tracking-wide" id="warningLevel"></p>
                     <p class="text-lg font-medium mt-2 opacity-90" id="warningMessage"></p>
+                    <p class="text-xs mt-2 opacity-70">(Tap the ⓘ icon for required actions)</p>
                 </div>
 
                 <!-- Other Details Grid -->
@@ -118,8 +134,49 @@
                     </div>
                 </div>
 
+                <!-- Disclaimer Footer -->
+                <div class="mt-8 pt-6 border-t border-gray-200">
+                    <p class="text-[10px] text-gray-400 leading-tight text-justify">
+                        <strong>Disclaimer:</strong> Managing heat risk in the workplace is a shared responsibility.
+                        This Heat Index is based on the environmental conditions of temperature and relative humidity. Heat stress risk is not just based on environmental conditions, but the interaction of the
+                        environmental conditions with the type of work being performed and the health and fitness status of the individual(s) performing the work. The heat index is simply a guideline to
+                        trigger additional controls and discussions under escalating heat stress ratings. Additional controls can be implemented at any time and work should be stopped at any time if it is considered unsafe to proceed, regardless of the Heat Index rating.
+                    </p>
+                </div>
+
             </div>
         </main>
+    </div>
+
+    <!-- Modal Overlay -->
+    <div id="infoModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
+        
+        <div class="modal-container bg-white w-11/12 md:max-w-md mx-auto rounded shadow-lg z-50 overflow-y-auto max-h-[90vh]">
+            
+            <!-- Modal Content -->
+            <div class="modal-content py-4 text-left px-6">
+                <!-- Title -->
+                <div class="flex justify-between items-center pb-3 border-b">
+                    <p class="text-2xl font-bold" id="modalTitle">Title</p>
+                    <div class="modal-close cursor-pointer z-50 p-2" id="closeModalBtn">
+                        <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                            <path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Body -->
+                <div class="my-5 text-sm text-gray-700 space-y-3" id="modalBody">
+                    <!-- Content injected by JS -->
+                </div>
+
+                <!-- Footer -->
+                <div class="flex justify-end pt-2">
+                    <button id="closeModalBottom" class="px-4 py-2 bg-blue-600 p-3 rounded-lg text-white hover:bg-blue-700">Close</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -144,6 +201,94 @@
         const windEl = document.getElementById('wind');
         const rainEl = document.getElementById('rain');
 
+        // Modal Elements
+        const infoButton = document.getElementById('infoButton');
+        const infoModal = document.getElementById('infoModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const closeModalBottom = document.getElementById('closeModalBottom');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const modalOverlay = document.querySelector('.modal-overlay');
+
+        let currentWarningLevel = "";
+
+        // Guidance Data
+        const guidanceData = {
+            "Caution": {
+                colorClass: "text-yellow-900",
+                intro: "Apply the planning and response operating principles as per the EQL standard for heat stress management."
+            },
+            "Extreme Caution": {
+                colorClass: "text-yellow-600",
+                intro: "Apply the planning and operation considerations as per the ‘Caution’ rating above in addition to giving further consideration to:",
+                bullets: [
+                    "Discuss at SMEACS/HazChat conversation that the heat stress rating has now moved to ‘Extreme Caution’ and confirm with workers they feel fit for the work, especially new workers and those that may not be acclimatised.",
+                    "Consider resourcing options or task adjustments may need to be made (e.g. additional crew, more frequent rotations).",
+                    "Consider that individual factors such as worker health status, previous day(s) heat exposure may have an increasing impact risk.",
+                    "Acknowledge self-pacing as an important self-regulatory way for workers to minimise excessive increases in core temperature.",
+                    "Consider the availability of controls such as access to shade, air conditioning, electrolyte replacement products (e.g. Sqwincher) at this higher heat stress rating.",
+                    "Heat Stress Eskies are to be carried on vehicles and applied as part of the first aid process for a significant heat illness."
+                ]
+            },
+            "Danger": {
+                colorClass: "text-orange-600",
+                intro: "Apply the planning and operation considerations as per the prior heat stress ratings above in addition to the following mandatory requirements:",
+                bullets: [
+                    "Discuss at SMEACS/HazChat conversation that the heat stress rating has now moved to ‘Danger’ and confirm with workers they feel fit for the work, especially those that may not be acclimatised.",
+                    "All work is reviewed and assessed on a case by case basis in consultation to establish agreed resources, noting potential limitations on the volume and type of work being performed. This may require consideration to postponing of other works to allow additional resources to be re-directed to support associated breaks and manage the heat hazard.",
+                    "Modify the work to rest ratio (i.e. less work and more rest), with the work to rest ratio being determined by the group conducting the work and taking into consideration the health status, acclimatisation status, and nature of work being performed by the team.",
+                    "Rest periods should be taken in a shaded/cooled or preferably airconditioned area e.g. vehicle cab.",
+                    "Heat Stress Eskies are to be carried on vehicles and applied as part of the first aid process for a significant heat illness."
+                ]
+            },
+            "Extreme Danger": {
+                colorClass: "text-red-600",
+                intro: "Undertake an assessment that includes consideration of whether the work should continue. <br><br>Apply the planning and operation considerations as per prior ratings above in addition to the following mandatory requirements:",
+                bullets: [
+                    "No long-distance walking (>2klms) without breaks in shaded/cooled or air-conditioning locations.",
+                    "If field work is to proceed, the work and approach is to be consulted with the team and resourcing agreed to enable adequate rotations and rest breaks to take place, commensurate to the environmental conditions and discussion around individual factors.",
+                    "In the event that field work is to proceed the ‘Extreme Danger’ heat stress rating must be communicated to workers in the Hazchat.",
+                    "Modify the work to rest ratio (i.e. less work and more rest), with the work to rest ratio being determined by the group conducting the work and taking into consideration the health status, acclimatisation status, and nature of work being performed by the team.",
+                    "Rest periods should be taken in a shaded/cooled or preferably airconditioned area e.g. vehicle cab.",
+                    "Heat Stress Eskies are to be carried on vehicles and applied as part of the first aid process for a significant heat illness."
+                ]
+            },
+            "Low Risk": {
+                colorClass: "text-green-600",
+                intro: "Conditions are generally safe. Continue to follow standard safety and hydration procedures."
+            }
+        };
+
+        // Modal Logic
+        function toggleModal() {
+            infoModal.classList.toggle('opacity-0');
+            infoModal.classList.toggle('pointer-events-none');
+            document.body.classList.toggle('modal-active');
+
+            if (!infoModal.classList.contains('opacity-0')) {
+                // Modal is opening, populate content
+                const data = guidanceData[currentWarningLevel];
+                modalTitle.innerText = currentWarningLevel;
+                modalTitle.className = `text-2xl font-bold ${data.colorClass || 'text-gray-800'}`;
+                
+                let html = `<p class="font-semibold">${data.intro}</p>`;
+                if (data.bullets) {
+                    html += `<ul class="list-disc pl-5 space-y-2 mt-3">`;
+                    data.bullets.forEach(bullet => {
+                        html += `<li>${bullet}</li>`;
+                    });
+                    html += `</ul>`;
+                }
+                modalBody.innerHTML = html;
+            }
+        }
+
+        infoButton.addEventListener('click', toggleModal);
+        closeModalBtn.addEventListener('click', toggleModal);
+        closeModalBottom.addEventListener('click', toggleModal);
+        modalOverlay.addEventListener('click', toggleModal);
+
+        // Existing Logic
         checkButton.addEventListener('click', () => {
             // Show loader, hide everything else
             checkButton.classList.add('hidden');
@@ -208,6 +353,7 @@
 
         async function geocodeAndFetch(cityName) {
             try {
+                // Search for the location
                 const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&format=json`;
                 const response = await fetch(geoUrl);
                 if (!response.ok) throw new Error("Location search failed.");
@@ -218,7 +364,15 @@
                 }
 
                 const location = geoData.results[0];
-                const name = `${location.name}, ${location.admin1 || location.country}`;
+                
+                // Construct a nice display name
+                const displayParts = [];
+                if (location.name) displayParts.push(location.name);
+                if (location.admin1) displayParts.push(location.admin1);
+                else if (location.country) displayParts.push(location.country);
+                
+                const name = displayParts.join(', ');
+
                 fetchDataAndDisplay(location.latitude, location.longitude, name);
 
             } catch (error) {
@@ -239,6 +393,9 @@
 
                 // 3. Calculate Warning
                 const warning = getWarningData(weather.apparent_temperature);
+                
+                // Store level globaly for modal usage
+                currentWarningLevel = warning.level;
 
                 // 4. Display
                 displayResults(weather, warning, city);
@@ -268,57 +425,65 @@
 
         async function getCityName(lat, lon) {
             try {
-                const apiUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`;
+                const apiUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
                 const response = await fetch(apiUrl, { headers: { 'Accept-Language': 'en-US' } });
                 if (!response.ok) return "Your Location";
+                
                 const data = await response.json();
-                return data.address.suburb || data.address.city || data.address.town || "Your Location";
+                const addr = data.address;
+
+                const specificName = addr.suburb || addr.neighbourhood || addr.village || addr.hamlet || addr.city_district;
+                const broadName = addr.town || addr.city || addr.municipality;
+                const state = addr.state;
+
+                if (specificName && state) {
+                    return `${specificName}, ${state}`;
+                } else if (specificName) {
+                    return specificName;
+                } else if (broadName) {
+                    return broadName;
+                }
+                return "Your Location";
+
             } catch (e) {
                 return "Your Location";
             }
         }
 
         function getWarningData(feelsLike) {
-            // Thresholds based on EQL Heat Index / Safety Standards
-            // < 27: Low
-            // 27 - 32: Caution (Cream)
-            // 33 - 39: Extreme Caution (Yellow)
-            // 40 - 51: Danger (Orange)
-            // >= 52: Extreme Danger (Red)
-
             if (feelsLike >= 52) {
                 return {
                     level: "Extreme Danger",
                     message: "Critical heat stress risk. Stop work if unsafe.",
-                    bgClass: "bg-red-600", // Red
+                    bgClass: "bg-red-600",
                     textClass: "text-white"
                 };
             } else if (feelsLike >= 40) {
                 return {
                     level: "Danger",
                     message: "Heat stroke likely. Mandatory rest breaks.",
-                    bgClass: "bg-orange-500", // Orange
+                    bgClass: "bg-orange-500",
                     textClass: "text-white"
                 };
             } else if (feelsLike >= 33) {
                 return {
                     level: "Extreme Caution",
                     message: "Take frequent breaks. Monitor hydration.",
-                    bgClass: "bg-yellow-400", // Yellow
+                    bgClass: "bg-yellow-400",
                     textClass: "text-gray-900"
                 };
             } else if (feelsLike >= 27) {
                 return {
                     level: "Caution",
                     message: "Plan work carefully. Stay hydrated.",
-                    bgClass: "bg-cream", // Custom Cream class defined in CSS
+                    bgClass: "bg-cream",
                     textClass: "text-yellow-900"
                 };
             } else {
                 return {
                     level: "Low Risk",
                     message: "Conditions are within standard limits.",
-                    bgClass: "bg-green-500", // Green
+                    bgClass: "bg-green-500",
                     textClass: "text-white"
                 };
             }
@@ -332,8 +497,7 @@
             warningMessageEl.innerText = warning.message;
             
             // Update Warning Box Colors
-            // Remove old classes first to be safe, though overwriting className works too
-            warningBoxEl.className = `p-6 rounded-2xl shadow-md text-center border-2 border-transparent transition-colors duration-300 ${warning.bgClass} ${warning.textClass}`;
+            warningBoxEl.className = `relative p-6 rounded-2xl shadow-md text-center border-2 border-transparent transition-colors duration-300 ${warning.bgClass} ${warning.textClass}`;
 
             actualTempEl.innerText = `${weather.temperature}°C`;
             humidityEl.innerText = `${weather.humidity}%`;
