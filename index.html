@@ -94,13 +94,19 @@
             <div id="manualInputBox" class="hidden mt-4 space-y-2 relative">
                 <label for="locationInput" class="block text-sm font-medium text-gray-700">Or enter location manually:</label>
                 <div class="flex space-x-2">
-                    <input type="text" id="locationInput" placeholder="e.g., 'West End'" class="flex-grow block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <div class="relative flex-grow">
+                        <input type="text" id="locationInput" placeholder="Type to search (e.g., 'West End')" class="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" autocomplete="off">
+                        <!-- Loading indicator inside input -->
+                        <div id="searchSpinner" class="hidden absolute right-3 top-2.5">
+                            <div class="animate-spin h-4 w-4 border-2 border-blue-500 rounded-full border-t-transparent"></div>
+                        </div>
+                    </div>
                     <button id="searchButton" class="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400">
                         Search
                     </button>
                 </div>
                 <!-- Search Results Dropdown -->
-                <ul id="searchResultsList" class="hidden absolute z-50 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                <ul id="searchResultsList" class="hidden absolute z-50 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto text-sm">
                     <!-- List items injected via JS -->
                 </ul>
             </div>
@@ -192,7 +198,7 @@
                         </div>
                     </div>
                     
-                    <!-- Horizontal Scroll Container (Increased padding to fix cropping) -->
+                    <!-- Horizontal Scroll Container -->
                     <div class="overflow-x-auto scrollbar-hide py-4 px-1 -mx-1">
                         <div class="flex space-x-3" id="hourlyTimeline">
                             <!-- JS will inject hourly cards here -->
@@ -255,7 +261,8 @@
         const manualInputBox = document.getElementById('manualInputBox');
         const locationInput = document.getElementById('locationInput');
         const searchButton = document.getElementById('searchButton');
-        const searchResultsList = document.getElementById('searchResultsList'); // New List
+        const searchResultsList = document.getElementById('searchResultsList');
+        const searchSpinner = document.getElementById('searchSpinner');
         const currentTimeLabel = document.getElementById('currentTimeLabel');
         const editLocationBtn = document.getElementById('editLocationBtn');
 
@@ -283,8 +290,9 @@
         const modalOverlay = document.querySelector('.modal-overlay');
 
         let currentWarningLevel = "";
+        let debounceTimer;
 
-        // Guidance Data
+        // Guidance Data (Unchanged)
         const guidanceData = {
             "Caution": {
                 colorClass: "text-yellow-900",
@@ -359,7 +367,7 @@
         closeModalBottom.addEventListener('click', toggleModal);
         modalOverlay.addEventListener('click', toggleModal);
 
-        // Location & Search Logic
+        // Event Listeners
         checkButton.addEventListener('click', () => {
             checkButton.classList.add('hidden');
             loader.classList.remove('hidden');
@@ -380,30 +388,37 @@
                 showError("Please enter a city or suburb name.");
                 return;
             }
-            // Don't hide everything yet, wait to see if we find matches
-            // Clear previous errors
             errorBox.classList.add('hidden');
             searchResultsList.classList.add('hidden');
-            searchResultsList.innerHTML = '';
-
-            geocodeAndFetch(cityName);
+            geocodeAndFetch(cityName, true); // Force selection if only one
         });
 
-        // Edit Button Logic
         editLocationBtn.addEventListener('click', () => {
-            // Hide results
             results.classList.add('hidden');
-            // Show initial search buttons again
             checkButton.classList.remove('hidden');
             manualInputBox.classList.remove('hidden');
             searchResultsList.classList.add('hidden');
-            // Clear input focus for convenience
             locationInput.value = '';
             locationInput.focus();
         });
 
+        // Auto-Search / Type-ahead Logic
+        locationInput.addEventListener('input', (e) => {
+            const query = e.target.value;
+            
+            clearTimeout(debounceTimer);
+            searchResultsList.classList.add('hidden');
+            
+            if (query.length < 3) return;
+
+            searchSpinner.classList.remove('hidden'); // Show spinner
+            
+            debounceTimer = setTimeout(() => {
+                geocodeAndFetch(query, false);
+            }, 500); // Wait 500ms after typing stops
+        });
+
         function handleGeoSuccess(position) {
-            // Hide manual input section when GPS succeeds
             manualInputBox.classList.add('hidden');
             fetchDataAndDisplay(position.coords.latitude, position.coords.longitude);
         }
@@ -420,7 +435,6 @@
                 const data = await response.json();
                 
                 if (data.latitude && data.longitude) {
-                    // Hide manual input section when fallback succeeds
                     manualInputBox.classList.add('hidden');
                     fetchDataAndDisplay(data.latitude, data.longitude, data.city);
                 } else {
@@ -432,57 +446,52 @@
             }
         }
 
-        async function geocodeAndFetch(cityName) {
+        async function geocodeAndFetch(cityName, forceSelection = false) {
             try {
-                // Request more results (count=10) to handle duplicates
-                // Filter for Australia client-side to ensure accuracy
-                const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=10&format=json`;
+                // Fetch 20 results to catch "West End" in AU vs World
+                const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=20&format=json`;
                 const response = await fetch(geoUrl);
                 if (!response.ok) throw new Error("Location search failed.");
                 
                 const geoData = await response.json();
                 let results = geoData.results || [];
 
-                // 1. Filter: Only keep results where country_code is "AU" (Australia)
+                // 1. STRICT FILTER: Only keep results where country_code is "AU"
                 results = results.filter(loc => loc.country_code === 'AU');
 
+                searchSpinner.classList.add('hidden'); // Hide spinner
+
                 if (results.length === 0) {
-                    throw new Error(`Could not find "${cityName}" in Australia.`);
+                    // If auto-typing, just show empty/message in dropdown, don't error out whole UI
+                    if (!forceSelection) {
+                        searchResultsList.innerHTML = '<li class="px-4 py-3 text-gray-500 text-sm">No Australian locations found.</li>';
+                        searchResultsList.classList.remove('hidden');
+                        return;
+                    } else {
+                         throw new Error(`Could not find "${cityName}" in Australia.`);
+                    }
                 }
 
-                // 2. Sort: Prioritize "Queensland" in admin1
+                // 2. SORT: Queensland first
                 results.sort((a, b) => {
                     const aIsQLD = (a.admin1 === "Queensland");
                     const bIsQLD = (b.admin1 === "Queensland");
-                    if (aIsQLD && !bIsQLD) return -1; // a comes first
-                    if (!aIsQLD && bIsQLD) return 1;  // b comes first
+                    if (aIsQLD && !bIsQLD) return -1; 
+                    if (!aIsQLD && bIsQLD) return 1; 
                     return 0;
                 });
 
-                if (results.length === 1) {
-                    // Only one result, proceed automatically
-                    const location = results[0];
-                    const displayParts = [];
-                    if (location.name) displayParts.push(location.name);
-                    if (location.admin2) displayParts.push(location.admin2); 
-                    if (location.admin1) displayParts.push(location.admin1);
-                    else if (location.country) displayParts.push(location.country);
-                    
-                    const name = displayParts.join(', ');
-                    
-                    // Hide manual box and loader
-                    loader.classList.remove('hidden');
-                    checkButton.classList.add('hidden');
-                    manualInputBox.classList.add('hidden');
-                    
-                    fetchDataAndDisplay(location.latitude, location.longitude, name);
+                if (results.length === 1 && forceSelection) {
+                    // Only one result and user clicked Search -> Go
+                    selectLocation(results[0]);
                 } else {
-                    // Multiple results, show list for user to pick
+                    // Show list for user to pick
                     renderSearchResults(results);
                 }
 
             } catch (error) {
-                showError(error.message);
+                searchSpinner.classList.add('hidden');
+                if(forceSelection) showError(error.message);
             }
         }
 
@@ -491,38 +500,25 @@
             
             results.forEach(loc => {
                 const li = document.createElement('li');
-                li.className = "px-4 py-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0 transition-colors";
+                li.className = "px-4 py-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0 transition-colors flex justify-between items-center";
                 
-                // Build a clear display string: "West End, Queensland, Australia"
-                let text = `<span class="font-semibold text-gray-800">${loc.name}</span>`;
-                const details = [];
-                if (loc.admin2) details.push(loc.admin2); // Added City/Region
-                if (loc.admin1) details.push(loc.admin1);
-                if (loc.country) details.push(loc.country);
+                // Build string: "West End"
+                // Details: "Townsville, Queensland"
+                const city = loc.name;
+                const regionParts = [];
+                if (loc.admin2) regionParts.push(loc.admin2); // e.g. Townsville
+                if (loc.admin1) regionParts.push(loc.admin1); // e.g. Queensland
+                const regionStr = regionParts.join(', ');
+
+                li.innerHTML = `
+                    <div>
+                        <span class="font-semibold text-gray-800 block">${city}</span>
+                        <span class="text-xs text-gray-500">${regionStr}</span>
+                    </div>
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                `;
                 
-                if (details.length > 0) {
-                    text += `<br><span class="text-xs text-gray-500">${details.join(', ')}</span>`;
-                }
-                
-                li.innerHTML = text;
-                
-                li.addEventListener('click', () => {
-                    // User picked this location
-                    const displayNameParts = [loc.name];
-                    if (loc.admin2) displayNameParts.push(loc.admin2); // Include City/Region in selected name
-                    if (loc.admin1) displayNameParts.push(loc.admin1);
-                    else if (loc.country) displayNameParts.push(loc.country);
-                    
-                    const displayName = displayNameParts.join(', ');
-                    
-                    // Update UI state
-                    searchResultsList.classList.add('hidden');
-                    loader.classList.remove('hidden');
-                    checkButton.classList.add('hidden');
-                    manualInputBox.classList.add('hidden');
-                    
-                    fetchDataAndDisplay(loc.latitude, loc.longitude, displayName);
-                });
+                li.addEventListener('click', () => selectLocation(loc));
                 
                 searchResultsList.appendChild(li);
             });
@@ -530,13 +526,28 @@
             searchResultsList.classList.remove('hidden');
         }
 
+        function selectLocation(loc) {
+            // User picked this location
+            const displayNameParts = [loc.name];
+            if (loc.admin2) displayNameParts.push(loc.admin2); 
+            if (loc.admin1) displayNameParts.push(loc.admin1);
+            
+            const displayName = displayNameParts.join(', ');
+            
+            // Update UI state
+            searchResultsList.classList.add('hidden');
+            loader.classList.remove('hidden');
+            checkButton.classList.add('hidden');
+            manualInputBox.classList.add('hidden');
+            
+            fetchDataAndDisplay(loc.latitude, loc.longitude, displayName);
+        }
+
         async function fetchDataAndDisplay(lat, lon, manualCityName = null) {
             try {
-                // Show loader if not already shown
                 loader.classList.remove('hidden');
                 results.classList.add('hidden');
                 
-                // Fetch Weather
                 const weather = await getWeatherData(lat, lon);
                 
                 let city = manualCityName;
@@ -544,14 +555,10 @@
                     city = await getCityName(lat, lon);
                 }
 
-                // Current Warning
                 const warning = getWarningData(weather.current.apparent_temperature);
                 currentWarningLevel = warning.level;
 
-                // Display Main Data
                 displayResults(weather, warning, city);
-                
-                // Render Timeline
                 renderTimeline(weather.hourly);
 
             } catch (error) {
@@ -590,7 +597,6 @@
         function renderTimeline(hourly) {
             hourlyTimeline.innerHTML = "";
             
-            // Calculate nearest hour for highlighting (e.g. 1:56 -> 2:00, so 14:00)
             const now = new Date();
             let currentHourNum = now.getHours();
             if (now.getMinutes() >= 30) {
@@ -599,32 +605,26 @@
 
             for (let i = 0; i < hourly.time.length; i++) {
                 const timeStr = hourly.time[i];
-                const hourPart = timeStr.split('T')[1]; // "07:00"
+                const hourPart = timeStr.split('T')[1]; 
                 const hourNum = parseInt(hourPart.split(':')[0], 10);
 
-                // Filter for 7am to 4pm
                 if (hourNum >= 7 && hourNum <= 16) {
                     const feelsLike = Math.round(hourly.apparent_temperature[i]);
                     const rainProb = hourly.precipitation_probability[i];
                     
-                    // Determine color for "Feels Like" timeline card
-                    let cardClass = "card-green"; // default < 27
+                    let cardClass = "card-green";
                     if (feelsLike >= 52) cardClass = "card-red";
                     else if (feelsLike >= 40) cardClass = "card-orange";
                     else if (feelsLike >= 33) cardClass = "card-yellow";
                     else if (feelsLike >= 27) cardClass = "card-cream";
 
-                    // Check if this is the current/nearest hour
                     const isCurrent = (hourNum === currentHourNum);
-                    // NOTE: removed bg-white to keep the card color visible
                     const highlightClass = isCurrent ? "ring-2 ring-blue-600 ring-offset-1 scale-110 z-10" : "";
                     const timeBadge = isCurrent ? `<span class="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-[8px] px-1.5 py-0.5 rounded-full shadow-sm">NOW</span>` : "";
 
-                    // Highlight RAIN if > 50%
                     const rainColorClass = rainProb >= 50 ? "text-blue-600 font-extrabold" : "text-gray-600";
                     const rainIconClass = rainProb >= 50 ? "text-blue-600" : "text-gray-400";
 
-                    // Format time (e.g. "07:00" -> "7am")
                     const ampm = hourNum >= 12 ? 'pm' : 'am';
                     const displayHour = hourNum % 12 || 12; 
                     const timeLabel = `${displayHour}${ampm}`;
@@ -637,13 +637,11 @@
                         <span class="text-xl font-bold">${feelsLike}°</span>
                         <span class="text-[9px] opacity-70">Feels Like</span>
                         <div class="mt-2 flex items-center space-x-1 opacity-90">
-                             <!-- Rain Umbrella Icon -->
                              <svg class="w-3 h-3 ${rainIconClass}" fill="currentColor" viewBox="0 0 24 24"><path d="M12 6c-3.87 0-7 3.13-7 7h14c0-3.87-3.13-7-7-7zm0-2c5.2 0 9.6 3.4 10.8 8H21v1c0 3.1-2.3 5.7-5.3 6.3v2.7h-2V19h-1.7v3h-2v-3H8v-2.7C5 15.7 2.7 13.1 2.7 10v-1h1.2C5.1 7.4 9.5 4 14.7 4h-2.7z"/></svg>
                              <span class="text-xs font-bold ${rainColorClass}">${rainProb}%</span>
                         </div>
                     `;
                     
-                    // Auto-scroll to the current hour if found
                     if (isCurrent) {
                         setTimeout(() => {
                             card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
@@ -723,7 +721,6 @@
         function displayResults(weather, warning, city) {
             locationEl.innerText = city;
             
-            // Display current time
             const now = new Date();
             currentTimeLabel.innerText = `Checked at ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
             
@@ -736,12 +733,10 @@
             actualTempEl.innerText = `${weather.current.temperature}°C`;
             humidityEl.innerText = `${weather.current.humidity}%`;
             
-            // Update Wind label to match Gusts (remove unit from value)
             windEl.innerText = `${weather.current.wind_speed}`;
             rainEl.innerText = `${weather.current.rain_probability}%`;
             gustsEl.innerText = `${weather.current.wind_gusts}`;
             
-            // UV Logic with text description
             const uv = weather.current.uv_index;
             let uvText = "Low";
             let uvClass = "text-green-600";
@@ -776,7 +771,6 @@
             manualInputBox.classList.remove('hidden');
             loader.classList.add('hidden');
             checkButton.classList.remove('hidden');
-            // Hide list if error happens
             searchResultsList.classList.add('hidden');
         }
     </script>
